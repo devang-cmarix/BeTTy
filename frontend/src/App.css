@@ -605,12 +605,33 @@ input[type='range'] {
 
 .hour {
   color: var(--baseline-heading);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 900;
   left: 50%;
   position: absolute;
   top: 50%;
-  z-index: 1;
+  z-index: 2;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.hour:hover {
+  background: rgba(255, 107, 61, 0.15);
+}
+
+.hour.selected {
+  background: var(--brand-primary, #ff6b3d) !important;
+  color: white !important;
 }
 
 .hour-0 { transform: translate(-50%, -78px); }
@@ -1702,4 +1723,186 @@ input[type='range'] {
   font-weight: 800;
   margin: 0;
   text-align: center;
+}
+
+/* AI Chatbot Assistant styles */
+.betty-chatbot-trigger {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-primary, #ff6b3d);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.betty-chatbot-trigger:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.betty-chatbot-container {
+  position: fixed;
+  bottom: 96px;
+  right: 24px;
+  width: 360px;
+  height: 480px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-family: inherit;
+  transition: all 0.25s ease-in-out;
+  transform-origin: bottom right;
+}
+
+.betty-chatbot-header {
+  background: linear-gradient(135deg, var(--brand-primary, #ff6b3d), #ff914d);
+  color: white;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.betty-chatbot-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.betty-chatbot-header-text {
+  flex: 1;
+}
+
+.betty-chatbot-header-text h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.betty-chatbot-header-text p {
+  margin: 2px 0 0 0;
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.betty-chatbot-close {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 1.2rem;
+  opacity: 0.8;
+  padding: 4px;
+}
+
+.betty-chatbot-close:hover {
+  opacity: 1;
+}
+
+.betty-chatbot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+}
+
+.betty-chatbot-msg {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.betty-chatbot-msg.user {
+  background: var(--brand-primary, #ff6b3d);
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.betty-chatbot-msg.bot {
+  background: white;
+  color: #334155;
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.betty-chatbot-typing {
+  align-self: flex-start;
+  background: transparent;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.betty-chatbot-input-area {
+  padding: 12px;
+  background: white;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 8px;
+}
+
+.betty-chatbot-input-area input {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.betty-chatbot-input-area input:focus {
+  border-color: var(--brand-primary, #ff6b3d);
+}
+
+.betty-chatbot-send {
+  background: var(--brand-primary, #ff6b3d);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.betty-chatbot-send:hover {
+  background: #ff5420;
+}
+
+.betty-chatbot-send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

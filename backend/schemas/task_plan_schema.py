@@ -14,6 +14,9 @@ class Resource(BaseModel):
     title: str
     author: Optional[str] = None
     url: Optional[str] = None
+    is_valid: Optional[bool] = None
+    duration: Optional[str] = None
+    reason: Optional[str] = None
 
 
 # ----------------------------

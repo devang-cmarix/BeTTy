@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -12,6 +14,7 @@ from routers.baseline_router import router as baseline_router
 from routers.gap_analysis_router import router as gap_analysis_router
 from routers.plan_router import router as plan_router
 from routers.task_router import router as task_router
+from routers.assistant_router import router as assistant_router
 
 app = FastAPI(
     title="Psychology Force Analysis API"
@@ -34,6 +37,7 @@ app.include_router(baseline_router)
 app.include_router(gap_analysis_router)
 app.include_router(plan_router)
 app.include_router(task_router)
+app.include_router(assistant_router)
 
 @app.get("/")
 def health():

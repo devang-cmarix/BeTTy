@@ -11,3 +11,5 @@ wheels/
 betty/
 testing/
 .env
+uv.lock
+settings.json

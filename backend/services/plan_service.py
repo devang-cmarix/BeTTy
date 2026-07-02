@@ -19,7 +19,7 @@ async def create_plan(
             "llm": llm,
             "journey_id": journey_id,
             "plan_days": plan_days
-        }
+        } # type: ignore
     )
 
     return result["final_plan"]

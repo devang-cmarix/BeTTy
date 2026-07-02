@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from typing import List
 
 
+from typing import Optional
+
 class ResourceItem(BaseModel):
 
     type: str
@@ -11,6 +13,11 @@ class ResourceItem(BaseModel):
     url: str
 
     reason: str
+
+    is_valid: Optional[bool] = None
+
+    duration: Optional[str] = None
+
 
 
 class DailyTask(BaseModel):

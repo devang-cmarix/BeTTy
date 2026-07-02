@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import './App.css'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -294,6 +294,55 @@ function App() {
     setBaselineResult(null)
   }
 
+  const handleAmPmChange = (target) => {
+    const timeVal = timeDraft[activeTimeField] || '00:00'
+    let [hours, minutes] = timeVal.split(':').map(Number)
+    if (target === 'AM') {
+      if (hours >= 12) {
+        hours -= 12
+      }
+    } else if (target === 'PM') {
+      if (hours < 12) {
+        hours += 12
+      }
+    }
+    const formattedHour = String(hours).padStart(2, '0')
+    const formattedMinute = String(minutes).padStart(2, '0')
+    const newTime = `${formattedHour}:${formattedMinute}`
+    setTimeDraft(current => ({
+      ...current,
+      [activeTimeField]: newTime
+    }))
+  }
+
+  const selectHour = (hour) => {
+    const timeVal = timeDraft[activeTimeField] || '00:00'
+    const [, minutesVal] = timeVal.split(':')
+    const minutes = Number(minutesVal || 0)
+    
+    const currentHours = Number(timeVal.split(':')[0] || 0)
+    const isPm = currentHours >= 12
+    
+    let targetHours = hour
+    if (isPm) {
+      if (hour !== 12) {
+        targetHours = hour + 12
+      }
+    } else {
+      if (hour === 12) {
+        targetHours = 0
+      }
+    }
+    
+    const formattedHour = String(targetHours).padStart(2, '0')
+    const formattedMinute = String(minutes).padStart(2, '0')
+    const newTime = `${formattedHour}:${formattedMinute}`
+    setTimeDraft(current => ({
+      ...current,
+      [activeTimeField]: newTime
+    }))
+  }
+
   function addTimeRange() {
     if (!timeDraft.start || !timeDraft.end) return
 
@@ -405,6 +454,32 @@ function App() {
     }
   }
 
+  async function updateSuccessCriteria(newCriteria) {
+    if (!aspirationId) return
+
+    setBaselineResult((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        gap_analysis: {
+          ...current.gap_analysis,
+          my_success_criteria: newCriteria,
+          success_criteria: newCriteria,
+        },
+      }
+    })
+
+    try {
+      await requestJson(`/gap-analysis/${aspirationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ my_success_criteria: newCriteria }),
+      })
+    } catch (err) {
+      setError(`Failed to update success criteria. ${err.message}`)
+    }
+  }
+
   async function generatePlan() {
     if (!aspirationId) {
       setError('Could not generate a plan because the aspiration ID is missing.')
@@ -456,27 +531,30 @@ function App() {
 
   if (phase === 'plan') {
     return (
-      <PlanPage
-        error={error}
-        forceLabel={activeForce?.label || selectedForce || 'Growth'}
-        loadingTask={loading.task}
-        onBack={() => setPhase('gap-analysis')}
-        onToggleTask={toggleTaskCompletion}
-        plan={planResult}
-        aspirationId={aspirationId}
-        onReplaceSuccess={(taskId, updatedTask) => {
-          setPlanResult((current) => {
-            if (!current) return current
-            const updatedTasks = current.tasks.map((t) => {
-              if (t.task_id === taskId) {
-                return updatedTask
-              }
-              return t
+      <>
+        <PlanPage
+          error={error}
+          forceLabel={activeForce?.label || selectedForce || 'Growth'}
+          loadingTask={loading.task}
+          onBack={() => setPhase('gap-analysis')}
+          onToggleTask={toggleTaskCompletion}
+          plan={planResult}
+          aspirationId={aspirationId}
+          onReplaceSuccess={(taskId, updatedTask) => {
+            setPlanResult((current) => {
+              if (!current) return current
+              const updatedTasks = current.tasks.map((t) => {
+                if (t.task_id === taskId) {
+                  return updatedTask
+                }
+                return t
+              })
+              return { ...current, tasks: updatedTasks }
             })
-            return { ...current, tasks: updatedTasks }
-          })
-        }}
-      />
+          }}
+        />
+        <ChatbotAssistant journeyId={aspirationId} />
+      </>
     )
   }
 
@@ -541,6 +619,7 @@ function App() {
           </div>
           {error && <p className="form-message error-message">{error}</p>}
         </section>
+        <ChatbotAssistant journeyId={aspirationId} />
       </main>
     )
   }
@@ -729,6 +808,46 @@ function App() {
                   Showing {activeTimeField === 'start' ? 'start' : 'end'} time:{' '}
                   <strong>{formatDisplayTime(activeClockTime)}</strong>
                 </div>
+
+                <div className="ampm-selector-container" style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
+                  <div className="ampm-selector" style={{ display: 'inline-flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleAmPmChange('AM')}
+                      style={{
+                        padding: '6px 16px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: Number(activeClockTime.split(':')[0] || 0) < 12 ? 'var(--brand-primary, #ff6b3d)' : 'transparent',
+                        color: Number(activeClockTime.split(':')[0] || 0) < 12 ? 'white' : '#64748b',
+                        fontWeight: '700',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      AM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAmPmChange('PM')}
+                      style={{
+                        padding: '6px 16px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: Number(activeClockTime.split(':')[0] || 0) >= 12 ? 'var(--brand-primary, #ff6b3d)' : 'transparent',
+                        color: Number(activeClockTime.split(':')[0] || 0) >= 12 ? 'white' : '#64748b',
+                        fontWeight: '700',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      PM
+                    </button>
+                  </div>
+                </div>
+
                 <div className="clock-face" aria-hidden="true">
                   {Array.from({ length: 60 }, (_, tick) => (
                     <i
@@ -745,11 +864,21 @@ function App() {
                     className="hand hand-minute"
                     style={{ transform: `rotate(${clockAngles.minuteAngle}deg)` }}
                   />
-                  {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hour, index) => (
-                    <b className={`hour hour-${index}`} key={hour}>
-                      {hour}
-                    </b>
-                  ))}
+                  {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hour, index) => {
+                    const currentHours = Number(activeClockTime.split(':')[0] || 0)
+                    const currentHour12 = currentHours % 12 || 12
+                    const isSelected = currentHour12 === hour
+                    return (
+                      <button
+                        className={`hour hour-${index} ${isSelected ? 'selected' : ''}`}
+                        key={hour}
+                        onClick={() => selectHour(hour)}
+                        type="button"
+                      >
+                        {hour}
+                      </button>
+                    )
+                  })}
                 </div>
                 <button className="blue-button" onClick={addTimeRange} type="button">
                   + Add Time Range
@@ -814,6 +943,7 @@ function App() {
             </button>
           </div>
         </form>
+        <ChatbotAssistant journeyId={aspirationId} />
       </main>
     )
   }
@@ -990,6 +1120,7 @@ function App() {
           </button>
         </section>
       )}
+      <ChatbotAssistant journeyId={aspirationId} />
     </main>
   )
 }
@@ -1093,6 +1224,338 @@ function GapList({ icon, title, subtitle, items }) {
         </ul>
       </div>
     </article>
+  )
+}
+
+function EditableGapList({ icon, title, subtitle, items, onChange }) {
+  const [editingIndex, setEditingIndex] = useState(null)
+  const [editValue, setEditValue] = useState('')
+  const [newItemValue, setNewItemValue] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+
+  const handleStartEdit = (index, value) => {
+    setEditingIndex(index)
+    setEditValue(value)
+  }
+
+  const handleSaveEdit = (index) => {
+    if (!editValue.trim()) return
+    const updated = [...items]
+    updated[index] = editValue.trim()
+    onChange(updated)
+    setEditingIndex(null)
+  }
+
+  const handleDelete = (index) => {
+    const updated = items.filter((_, idx) => idx !== index)
+    onChange(updated)
+  }
+
+  const handleAdd = () => {
+    if (!newItemValue.trim()) return
+    const updated = [...items, newItemValue.trim()]
+    onChange(updated)
+    setNewItemValue('')
+    setShowAddForm(false)
+  }
+
+  return (
+    <article className="gap-card editable-gap-card">
+      <h3>
+        <span>{icon}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1 }}>
+          <span>{title}</span>
+          {!showAddForm && (
+            <button 
+              type="button" 
+              className="add-criteria-btn"
+              onClick={() => setShowAddForm(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--brand-primary, #ff6b3d)',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '0 8px'
+              }}
+            >
+              + Add
+            </button>
+          )}
+        </div>
+      </h3>
+      <div className="gap-content">
+        {subtitle && <p className="gap-subtitle" style={{ fontSize: '0.85rem', color: '#888', marginTop: '-4px', marginBottom: '8px' }}>{subtitle}</p>}
+        
+        <ul className="editable-criteria-list" style={{ paddingLeft: 0, listStyle: 'none', margin: 0 }}>
+          {items.map((item, index) => (
+            <li 
+              key={index} 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                padding: '8px 0',
+                borderBottom: '1px solid #f0f0f0',
+                gap: '10px'
+              }}
+            >
+              {editingIndex === index ? (
+                <div style={{ display: 'flex', width: '100%', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveEdit(index)
+                      if (e.key === 'Escape') setEditingIndex(null)
+                    }}
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ccc',
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => handleSaveEdit(index)}
+                    style={{
+                      background: '#4caf50',
+                      color: 'white',
+                      border: 'none',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Save
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingIndex(null)}
+                    style={{
+                      background: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span style={{ flex: 1, fontSize: '0.95rem', color: '#333' }}>{item}</span>
+                  <div style={{ display: 'flex', gap: '8px', opacity: 0.8 }} className="item-actions">
+                    <button 
+                      type="button" 
+                      onClick={() => handleStartEdit(index, item)}
+                      title="Edit"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#666',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      ✏️
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => handleDelete(index)}
+                      title="Delete"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#d32f2f',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          ))}
+          {items.length === 0 && (
+            <li style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', padding: '8px 0' }}>
+              No success criteria added yet.
+            </li>
+          )}
+        </ul>
+
+        {showAddForm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px', padding: '10px', background: '#fcfcfc', borderRadius: '6px', border: '1px dashed #ddd' }}>
+            <input
+              type="text"
+              placeholder="e.g. STOP eating junk foods or START journaling daily"
+              value={newItemValue}
+              onChange={(e) => setNewItemValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd()
+              }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '0.9rem'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button 
+                type="button" 
+                onClick={() => setShowAddForm(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#666',
+                  cursor: 'pointer',
+                  padding: '4px 8px'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleAdd}
+                style={{
+                  background: 'var(--brand-primary, #ff6b3d)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Add Criteria
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function ChatbotAssistant({ journeyId }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Hi! I am BeTTY, your behavioral coaching assistant. How can I help you with your growth plan or aspirations today?' }
+  ])
+  const [inputVal, setInputVal] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, isOpen])
+
+  const handleSend = async (e) => {
+    if (e) e.preventDefault()
+    if (!inputVal.trim() || isLoading) return
+
+    const userMessage = inputVal.trim()
+    setInputVal('')
+    
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setIsLoading(true)
+
+    try {
+      const chatHistory = messages.map(msg => ({ role: msg.role, content: msg.content }))
+      const response = await requestJson('/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          journey_id: journeyId || null,
+          history: chatHistory
+        })
+      })
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: response.reply }])
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, I encountered an error: ${err.message}` }])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <button 
+        type="button" 
+        className="betty-chatbot-trigger" 
+        onClick={() => setIsOpen(!isOpen)}
+        title="Chat with BeTTY"
+      >
+        {isOpen ? '💬' : '🧠'}
+      </button>
+
+      {isOpen && (
+        <div className="betty-chatbot-container">
+          <div className="betty-chatbot-header">
+            <div className="betty-chatbot-avatar">B</div>
+            <div className="betty-chatbot-header-text">
+              <h3>BeTTY Assistant</h3>
+              <p>Coaching & Plan Support</p>
+            </div>
+            <button 
+              type="button" 
+              className="betty-chatbot-close" 
+              onClick={() => setIsOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="betty-chatbot-messages">
+            {messages.map((msg, index) => (
+              <div key={index} className={`betty-chatbot-msg ${msg.role === 'user' ? 'user' : 'bot'}`}>
+                {msg.content}
+              </div>
+            ))}
+            {isLoading && (
+              <div className="betty-chatbot-typing">
+                BeTTY is thinking...
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={handleSend} className="betty-chatbot-input-area">
+            <input
+              type="text"
+              placeholder="Ask about your plan, baseline, or gap..."
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              disabled={isLoading}
+            />
+            <button 
+              type="submit" 
+              className="betty-chatbot-send" 
+              disabled={isLoading || !inputVal.trim()}
+            >
+              Send
+            </button>
+          </form>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -1373,10 +1836,12 @@ function ResourceGroup({ group, compact = false }) {
 function ResourceItem({ item }) {
   const title = typeof item === 'string' ? item : item.title
   const detail = typeof item === 'string' ? '' : item.reason || item.description || item.category
-  const type = typeof item === 'string' ? '' : item.type
+  const type = typeof item === 'string' ? '' : item.type || item.resource_type
   const url = typeof item === 'string' ? '' : item.url || item.link || item.href
+  const isValid = typeof item === 'string' ? true : (item.is_valid !== false)
   const fallbackUrl = title ? buildResourceSearchUrl(type, title) : ''
   const displayUrl = url || fallbackUrl
+  const duration = typeof item === 'string' ? '' : item.duration || item.duration_display
 
   return (
     <div className="resource-item">
@@ -1388,9 +1853,13 @@ function ResourceItem({ item }) {
         ) : (
           <strong>{title}</strong>
         )}
-        {type && <span>{type}</span>}
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {type && <span>{type}</span>}
+          {duration && <span style={{ background: '#fef3c7', color: '#d97706', borderColor: '#fde68a' }}>{duration}</span>}
+        </div>
       </div>
       {detail && <p>{detail}</p>}
+      {!isValid && <p style={{ color: '#b45309', margin: '4px 0 0' }}>This link may be unavailable, but it is still included for preview.</p>}
       {displayUrl && (
         <a className="resource-link" href={displayUrl} rel="noreferrer" target="_blank">
           Open resource
@@ -1556,7 +2025,7 @@ function ReplaceTaskModal({ task, tasks, aspirationId, onClose, onReplaceSuccess
                           <span className="alt-icon">
                             {res.resource_type === 'video' ? '▶️' : res.resource_type === 'audio' ? '🎙️' : '📚'}
                           </span>
-                          Rec: {res.title} {res.url && <span className="link-icon">🔗</span>}
+                          Rec: {res.title} {res.duration && `(${res.duration})`} {res.url && <span className="link-icon">🔗</span>}
                         </span>
                       ))}
                     </div>

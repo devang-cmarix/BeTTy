@@ -32,7 +32,7 @@ async def save_baseline(
         baseline["motivation_score"]
     )
 
-    gap_analysis = generate_gap_analysis(
+    gap_analysis = await generate_gap_analysis(
         aspiration["aspiration"]["text"],
         baseline,
         aspiration.get("input", {})

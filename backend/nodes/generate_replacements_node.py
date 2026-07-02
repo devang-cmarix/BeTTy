@@ -53,9 +53,76 @@ async def generate_replacements_node(
 
     )
 
-    state["alternatives"] = (
-        result.model_dump()["alternatives"]
+    alternatives = result.model_dump()["alternatives"]
+
+    from validators.task_validator import validate_task_duration, validate_and_adjust_task_schedule
+    alternatives = validate_task_duration(
+        tasks=alternatives,
+        max_minutes=state["baseline"].get("daily_commitment_minutes", 50)
     )
+    alternatives = validate_and_adjust_task_schedule(
+        tasks=alternatives,
+        preferred_time_ranges=state["baseline"].get("preferred_time_ranges", [])
+    )
+
+    import asyncio
+    from utils.resource_helper import get_allowed_resource_types, fetch_and_validate_resources
+
+    async def add_real_resources(t):
+        baseline = state["baseline"]
+        learning_preferences = baseline.get("learning_preferences", [])
+        allowed = get_allowed_resource_types(learning_preferences)
+        # Similar rules as task chunks: skip resources for physical tasks and
+        # only include audio/video when the replacement explicitly requests it.
+        text = " ".join([
+            str(t.get("title", "")),
+            str(t.get("description", "")),
+            str(t.get("rationale", "")),
+        ]).lower()
+
+        physical_keywords = [
+            "run", "walk", "jog", "lift", "squat", "press", "push",
+            "pull", "stretch", "yoga", "exercise", "movement",
+        ]
+        if any(k in text for k in physical_keywords):
+            t["resources"] = []
+            return t
+
+        requires_audio = any(w in text for w in ("listen", "hear", "podcast", "audio"))
+        requires_video = any(w in text for w in ("watch", "watching", "video", "youtube"))
+        wants_reading = any(w in text for w in ("read", "book", "article", "chapter"))
+
+        # Prioritize explicit task requests: fetch requested types even if not in user prefs
+        filtered_allowed = []
+        if requires_video:
+            filtered_allowed.append("video")
+        if requires_audio:
+            filtered_allowed.append("audio")
+        if wants_reading:
+            filtered_allowed.extend(["book", "article"]) 
+        filtered_allowed = list(dict.fromkeys(filtered_allowed))
+
+        if not filtered_allowed:
+            t["resources"] = []
+            return t
+
+        max_seconds = None
+        try:
+            max_seconds = int(t.get("duration_minutes", 0)) * 60
+            if max_seconds <= 0:
+                max_seconds = None
+        except Exception:
+            max_seconds = None
+
+        t["resources"] = await fetch_and_validate_resources(t["title"], filtered_allowed, max_duration_seconds=max_seconds)
+        from utils.resource_helper import ensure_fallback_resources, update_task_with_real_resources
+        t = ensure_fallback_resources(t)
+        t = update_task_with_real_resources(t)
+        return t
+
+    alternatives = list(await asyncio.gather(*(add_real_resources(t) for t in alternatives)))
+
+    state["alternatives"] = alternatives
 
     await state["db"].replacement_cache.delete_many(
         {
