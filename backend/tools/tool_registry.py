@@ -165,6 +165,38 @@ TOOLS = {
 
         }
 
+    },
+
+    "RESOURCE": {
+
+        "SEARCH": {
+
+            "function": search_tasks,
+
+            "requires": [
+
+                "journey_id",
+
+                "keyword"
+
+            ]
+
+        },
+
+        "SHOW": {
+
+            "function": search_tasks,
+
+            "requires": [
+
+                "journey_id",
+
+                "keyword"
+
+            ]
+
+        }
+
     }
 
 }

@@ -1450,11 +1450,69 @@ function EditableGapList({ icon, title, subtitle, items, onChange }) {
   )
 }
 
+const DEFAULT_SUGGESTIONS = [
+  'My Aspiration', 'Gap Analysis', 'Progress', 'My Tasks'
+]
+
+function formatMessageContent(content) {
+  if (!content) return '';
+  const regex = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))|(https?:\/\/[^\s/$.?#].[^\s]*)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.substring(lastIndex, match.index));
+    }
+    
+    if (match[1]) {
+      // Markdown link
+      const text = match[2];
+      const url = match[3];
+      parts.push(
+        <a 
+          key={match.index} 
+          href={url} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          style={{ color: '#ff6b3d', textDecoration: 'underline', fontWeight: 'bold' }}
+        >
+          {text}
+        </a>
+      );
+    } else if (match[4]) {
+      // Raw URL
+      const url = match[4];
+      const cleanUrl = url.replace(/[.,;:!]$/, '');
+      parts.push(
+        <a 
+          key={match.index} 
+          href={cleanUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          style={{ color: '#ff6b3d', textDecoration: 'underline', fontWeight: 'bold' }}
+        >
+          {cleanUrl}
+        </a>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : content;
+}
+
 function ChatbotAssistant({ journeyId }) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I am BeTTY, your behavioral coaching assistant. How can I help you with your growth plan or aspirations today?' }
+    { role: 'assistant', content: "Hi! I'm BeTTY AI, your personal coaching companion. You've completed all stages! Ask me anything about your aspiration, gap analysis, or your personalised tasks." }
   ])
+  const [currentSuggestions, setCurrentSuggestions] = useState(DEFAULT_SUGGESTIONS)
   const [inputVal, setInputVal] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef(null)
@@ -1465,14 +1523,17 @@ function ChatbotAssistant({ journeyId }) {
     }
   }, [messages, isOpen])
 
-  const handleSend = async (e) => {
+  const handleSend = async (e, customText = null) => {
     if (e) e.preventDefault()
-    if (!inputVal.trim() || isLoading) return
-
-    const userMessage = inputVal.trim()
-    setInputVal('')
     
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    const textToSend = customText ? customText.trim() : inputVal.trim()
+    if (!textToSend || isLoading) return
+
+    if (!customText) {
+      setInputVal('')
+    }
+    
+    setMessages(prev => [...prev, { role: 'user', content: textToSend }])
     setIsLoading(true)
 
     try {
@@ -1481,19 +1542,26 @@ function ChatbotAssistant({ journeyId }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage,
+          message: textToSend,
           journey_id: journeyId || null,
           history: chatHistory
         })
       })
       
       setMessages(prev => [...prev, { role: 'assistant', content: response.reply }])
+      if (response.suggestions && response.suggestions.length > 0) {
+        setCurrentSuggestions(response.suggestions)
+      } else {
+        setCurrentSuggestions(DEFAULT_SUGGESTIONS)
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, I encountered an error: ${err.message}` }])
     } finally {
       setIsLoading(false)
     }
   }
+
+  const showSuggestions = !isLoading && messages.length > 0 && messages[messages.length - 1].role === 'assistant';
 
   return (
     <>
@@ -1526,9 +1594,25 @@ function ChatbotAssistant({ journeyId }) {
           <div className="betty-chatbot-messages">
             {messages.map((msg, index) => (
               <div key={index} className={`betty-chatbot-msg ${msg.role === 'user' ? 'user' : 'bot'}`}>
-                {msg.content}
+                {formatMessageContent(msg.content)}
               </div>
             ))}
+            
+            {showSuggestions && (
+              <div className="betty-chatbot-suggestions">
+                {currentSuggestions.map((sug, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="betty-chatbot-suggestion-pill"
+                    onClick={() => handleSend(null, sug)}
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {isLoading && (
               <div className="betty-chatbot-typing">
                 BeTTY is thinking...

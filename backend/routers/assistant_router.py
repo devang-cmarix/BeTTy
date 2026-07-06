@@ -90,7 +90,9 @@ async def chat(
 
             "intent": result["intent"],
 
-            "sources": serialize_for_json(result["sources"])
+            "sources": serialize_for_json(result["sources"]),
+
+            "suggestions": result.get("suggestions", [])
 
         }
 

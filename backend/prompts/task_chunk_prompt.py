@@ -49,6 +49,15 @@ Rules:
 - obstacles
 - mindset improvements
 
+7. Tasks MUST strictly align with the user's Learning Preferences:
+- If the user's learning preferences include 'doing action' or are action-oriented, generate practical, experiential, or behavioral action tasks that do not require external resources (these tasks should have an empty resources list).
+- If the user's learning preferences include 'listening' or 'audio'/'podcast', you may generate tasks that involve listening, and attach ONLY 'audio'/'podcast' resource types.
+- If the user's learning preferences include 'reading', you may generate tasks that involve reading, and attach ONLY 'book'/'article' resource types.
+- If the user's learning preferences include 'watching' or 'video', you may generate tasks that involve watching, and attach ONLY 'video' resource types.
+- DO NOT generate tasks that require reading if 'reading' or 'book'/'article' is not in the Allowed Resource Types.
+- DO NOT generate tasks that require watching if 'watching' or 'video' is not in the Allowed Resource Types.
+- DO NOT generate tasks that require listening if 'listening' or 'audio'/'podcast' is not in the Allowed Resource Types.
+
 Learning Preferences:
 {learning_preferences}
 

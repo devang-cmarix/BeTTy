@@ -54,6 +54,11 @@ PLANNING_RULES = {
 
         {
             "domain": "PLAN",
+            "action": "SHOW"
+        },
+
+        {
+            "domain": "PLAN",
             "action": "PROGRESS"
         }
 
@@ -123,11 +128,29 @@ PLANNING_RULES = {
 
     ],
 
+    ("TASK", "SEARCH"): [
+
+        {
+            "domain": "TASK",
+            "action": "SEARCH"
+        }
+
+    ],
+
     ("RESOURCE", "SEARCH"): [
 
         {
             "domain": "RESOURCE",
             "action": "SEARCH"
+        }
+
+    ],
+
+    ("RESOURCE", "SHOW"): [
+
+        {
+            "domain": "RESOURCE",
+            "action": "SHOW"
         }
 
     ],
@@ -158,9 +181,19 @@ async def planning_node(state):
 
     )
 
-    state["tool_plan"] = PLANNING_RULES.get(
+    tool_plan = list(PLANNING_RULES.get(
         key,
         []
-    )
+    ))
+
+    if intent.get("day") is not None:
+        has_task_show = any(step["domain"] == "TASK" and step["action"] == "SHOW" for step in tool_plan)
+        if not has_task_show:
+            tool_plan.append({
+                "domain": "TASK",
+                "action": "SHOW"
+            })
+
+    state["tool_plan"] = tool_plan
 
     return state

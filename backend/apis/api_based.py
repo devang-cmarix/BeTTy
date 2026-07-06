@@ -51,9 +51,11 @@ class ApiBasedFetcher:
         self.client = client or httpx.AsyncClient(timeout=timeout)
         self.source_timeout = source_timeout
         self.request_count = 0
+        self._owns_client = (client is None)
 
     async def close(self):
-        await self.client.aclose()
+        if self._owns_client:
+            await self.client.aclose()
 
     async def search_youtube(self, query: str, max_results: int = 3) -> list[Resource]:
         if YOUTUBE_API_KEY:

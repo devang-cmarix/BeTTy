@@ -16,6 +16,25 @@
   --surface: #ffffff;
   --text: #334155;
   --text-h: #0f172a;
+
+  /* Global baseline variables for light theme fallback */
+  --baseline-bg: #eaf0ff;
+  --baseline-card: #ffffff;
+  --baseline-panel: #f8f9fb;
+  --baseline-panel-strong: #fbfcff;
+  --baseline-border: #dbe5f4;
+  --baseline-border-strong: #d6e1f1;
+  --baseline-text: #0c2242;
+  --baseline-heading: #071b34;
+  --baseline-muted: #50658c;
+  --baseline-muted-soft: #7890b6;
+  --baseline-chip: #ffffff;
+  --baseline-blue: #4f8df7;
+  --baseline-blue-strong: #4f46e5;
+  --baseline-clock: #ffffff;
+  --baseline-clock-ring: #f1f5fb;
+  --baseline-clock-tick: #cbd8ec;
+  --baseline-shadow: 0 16px 36px rgba(37, 64, 106, 0.12);
   --sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -98,5 +117,24 @@ h3 {
     --surface: #111827;
     --text: #cbd5e1;
     --text-h: #f8fafc;
+
+    /* Global baseline variables for dark theme fallback */
+    --baseline-bg: #060b16;
+    --baseline-card: #111827;
+    --baseline-panel: #0b1220;
+    --baseline-panel-strong: #0f172a;
+    --baseline-border: #243047;
+    --baseline-border-strong: #334155;
+    --baseline-text: #dbeafe;
+    --baseline-heading: #f8fafc;
+    --baseline-muted: #9fb1cc;
+    --baseline-muted-soft: #7f92b2;
+    --baseline-chip: #151f31;
+    --baseline-blue: #3b82f6;
+    --baseline-blue-strong: #6366f1;
+    --baseline-clock: #f8fafc;
+    --baseline-clock-ring: #dbeafe;
+    --baseline-clock-tick: #93a4bf;
+    --baseline-shadow: 0 20px 42px rgba(0, 0, 0, 0.38);
   }
 }

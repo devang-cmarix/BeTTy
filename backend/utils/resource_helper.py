@@ -9,6 +9,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 import asyncio
+import httpx
 from backend.apis.api_based import ApiBasedFetcher
 from backend.apis.validator import LinkValidator
 from backend.apis.models import (
@@ -30,29 +31,66 @@ def get_allowed_resource_types(learning_preferences):
             allowed.append("audio")
     return list(dict.fromkeys(allowed))
 
-async def fetch_and_validate_resources(query: str, allowed_types: list[str], max_duration_seconds: int | None = None) -> list[dict]:
+def clean_search_query(query: str) -> str:
+    import re
+    # Strip quotes
+    q = query.strip().strip("'\"")
+    
+    # Match and remove leading verbs, articles, and resource types
+    leading_pattern = re.compile(
+        r'^(?:listen\s+to|watch|read|find|search\s+for|get|use|learn\s+from|study)\s+'
+        r'(?:a|an|the|some|our|your|my|recommended)?\s*'
+        r'(?:podcast|video|book|article|audio|show|episode|clip|resource|reading|material)?\s*'
+        r'(?:on|about|for|of|to|regarding)?\s*',
+        re.IGNORECASE
+    )
+    q = leading_pattern.sub('', q)
+    
+    # Also handle if it just starts with "podcast on...", "video about..."
+    leading_noun_pattern = re.compile(
+        r'^(?:podcast|video|book|article|audio|show|episode|clip|resource|reading|material)\s+'
+        r'(?:on|about|for|of|to|regarding)\s*',
+        re.IGNORECASE
+    )
+    q = leading_noun_pattern.sub('', q)
+    
+    # Remove trailing resource type keywords
+    trailing_pattern = re.compile(
+        r'\s+(?:podcast|video|book|article|audio|show|episode|clip|resource|reading|material)$',
+        re.IGNORECASE
+    )
+    # Only remove trailing if it doesn't make the query empty
+    cleaned = trailing_pattern.sub('', q)
+    if cleaned.strip():
+        q = cleaned
+        
+    return q.strip().strip("'\".,;:-\b") if q.strip() else query
+
+async def fetch_and_validate_resources(query: str, allowed_types: list[str], max_duration_seconds: int | None = None, client: httpx.AsyncClient | None = None) -> list[dict]:
     # If no resource types are allowed, return empty list immediately
     if not allowed_types:
         return []
 
-    fetcher = ApiBasedFetcher()
-    validator = LinkValidator()
+    cleaned_query = clean_search_query(query)
+
+    fetcher = ApiBasedFetcher(client=client)
+    validator = LinkValidator(client=client)
     
     search_tasks = []
     types_mapped = []
 
     # Map search functions
     if "video" in allowed_types:
-        search_tasks.append(fetcher.search_youtube(query, max_results=2))
+        search_tasks.append(fetcher.search_youtube(cleaned_query, max_results=2))
         types_mapped.append("video")
     if "audio" in allowed_types:
-        search_tasks.append(fetcher.search_podcasts(query, max_results=2))
+        search_tasks.append(fetcher.search_podcasts(cleaned_query, max_results=2))
         types_mapped.append("audio")
     if "book" in allowed_types:
-        search_tasks.append(fetcher.search_books(query, max_results=2))
+        search_tasks.append(fetcher.search_books(cleaned_query, max_results=2))
         types_mapped.append("book")
     if "article" in allowed_types:
-        search_tasks.append(fetcher.search_articles(query, max_results=2))
+        search_tasks.append(fetcher.search_articles(cleaned_query, max_results=2))
         types_mapped.append("article")
 
     if not search_tasks:
@@ -202,7 +240,7 @@ def update_task_with_real_resources(t: dict) -> dict:
     return t
 
 
-def ensure_fallback_resources(t: dict) -> dict:
+def ensure_fallback_resources(t: dict, allowed_types: list[str] = None) -> dict:
     text = " ".join([
         str(t.get("title", "")),
         str(t.get("description", "")),
@@ -223,45 +261,58 @@ def ensure_fallback_resources(t: dict) -> dict:
     duration_mins = t.get("duration_minutes", 15)
     duration_display = f"{duration_mins} min"
 
+    cleaned_title = clean_search_query(t.get('title', ''))
+
     if requires_video and "video" not in fetched_types:
-        resources.append({
-            "type": "video",
-            "resource_type": "video",
-            "title": f"Recommended video: {t.get('title', 'Instructional Video')}",
-            "url": f"https://www.youtube.com/results?search_query={urllib.parse.quote(t.get('title', 'Instructional Video'))}",
-            "reason": f"A helpful video resource to guide you through: {t.get('title', '')}.",
-            "is_valid": True,
-            "duration": duration_display,
-            "duration_display": duration_display,
-        })
-        fetched_types.add("video")
+        if allowed_types is None or "video" in allowed_types:
+            q_title = cleaned_title or 'Instructional Video'
+            resources.append({
+                "type": "video",
+                "resource_type": "video",
+                "title": f"Recommended video: {q_title}",
+                "url": f"https://www.youtube.com/results?search_query={urllib.parse.quote(q_title)}",
+                "reason": f"A helpful video resource to guide you through: {t.get('title', '')}.",
+                "is_valid": True,
+                "duration": duration_display,
+                "duration_display": duration_display,
+            })
+            fetched_types.add("video")
 
     if requires_audio and not any(x in fetched_types for x in ("audio", "podcast")):
-        resources.append({
-            "type": "audio",
-            "resource_type": "audio",
-            "title": f"Recommended audio: {t.get('title', 'Podcast Episode')}",
-            "url": f"https://www.google.com/search?q={urllib.parse.quote(t.get('title', 'Podcast Episode'))}+podcast",
-            "reason": f"A helpful audio episode to listen to: {t.get('title', '')}.",
-            "is_valid": True,
-            "duration": duration_display,
-            "duration_display": duration_display,
-        })
-        fetched_types.add("audio")
+        if allowed_types is None or "audio" in allowed_types:
+            q_title = cleaned_title or 'Podcast Episode'
+            resources.append({
+                "type": "audio",
+                "resource_type": "audio",
+                "title": f"Recommended audio: {q_title}",
+                "url": f"https://podcasts.apple.com/us/search?term={urllib.parse.quote(q_title)}",
+                "reason": f"A helpful audio episode to listen to: {t.get('title', '')}.",
+                "is_valid": True,
+                "duration": duration_display,
+                "duration_display": duration_display,
+            })
+            fetched_types.add("audio")
 
     if wants_reading and not any(x in fetched_types for x in ("book", "article")):
         res_type = "book" if "book" in text or "chapter" in text else "article"
-        resources.append({
-            "type": res_type,
-            "resource_type": res_type,
-            "title": f"Recommended {res_type}: {t.get('title', 'Reading Material')}",
-            "url": f"https://www.google.com/search?q={urllib.parse.quote(t.get('title', 'Reading Material'))}+{res_type}",
-            "reason": f"A helpful {res_type} to read: {t.get('title', '')}.",
-            "is_valid": True,
-            "duration": duration_display,
-            "duration_display": duration_display,
-        })
-        fetched_types.add(res_type)
+        if allowed_types is None or res_type in allowed_types:
+            q_title = cleaned_title or 'Reading Material'
+            fallback_url = (
+                f"https://books.google.com/books?q={urllib.parse.quote(q_title)}"
+                if res_type == "book"
+                else f"https://www.google.com/search?q={urllib.parse.quote(q_title)}"
+            )
+            resources.append({
+                "type": res_type,
+                "resource_type": res_type,
+                "title": f"Recommended {res_type}: {q_title}",
+                "url": fallback_url,
+                "reason": f"A helpful {res_type} to read: {t.get('title', '')}.",
+                "is_valid": True,
+                "duration": duration_display,
+                "duration_display": duration_display,
+            })
+            fetched_types.add(res_type)
 
     return t
 

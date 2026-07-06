@@ -8,6 +8,63 @@ async def context_builder_node(state):
     sections = []
 
     # ---------------------------------
+    # Query all completed plans for the user
+    # ---------------------------------
+    db = state["db"]
+    active_id = state.get("journey_id")
+    
+    plans_section = []
+    try:
+        from bson import ObjectId
+        cursor = db.aspirations.find({}, {"input": 1, "aspiration": 1, "baseline": 1, "change_plan": 1})
+        count = 1
+        async for doc in cursor:
+            if not doc.get("baseline"):
+                continue
+            input_data = doc.get("input") or {}
+            force = input_data.get("force")
+            if not force and doc.get("change_plan"):
+                force = doc["change_plan"].get("force")
+            if not force:
+                continue
+                
+            asp_text = ""
+            asp_data = doc.get("aspiration")
+            if asp_data:
+                if isinstance(asp_data, dict):
+                    asp_text = asp_data.get("text") or asp_data.get("aspiration") or ""
+                else:
+                    asp_text = str(asp_data)
+            
+            issue = input_data.get("issue") or "None"
+            root_causes = input_data.get("root_causes") or []
+            root_causes_str = ", ".join(root_causes) if isinstance(root_causes, list) else str(root_causes)
+            
+            is_active = str(doc["_id"]) == str(active_id)
+            active_suffix = " (Active Plan)" if is_active else ""
+            plans_section.append(
+                f"{count}. {force}{active_suffix}\n"
+                f"   Aspiration: {asp_text}\n"
+                f"   Selected Issue: {issue}\n"
+                f"   Root Causes: {root_causes_str}"
+            )
+            count += 1
+    except Exception as e:
+        pass
+        
+    if plans_section:
+        plans_list_str = "\n".join(plans_section)
+        sections.append(
+            f"""
+==========================
+USER PLANS (ALL)
+==========================
+You currently have:
+{plans_list_str}
+"""
+        )
+
+    # ---------------------------------
     # Aspiration
     # ---------------------------------
 
@@ -16,19 +73,21 @@ async def context_builder_node(state):
     )
 
     if aspiration and aspiration.get("exists"):
+        aspiration_data = aspiration["aspiration"]
+        input_data = aspiration.get("input") or {}
+        force_label = input_data.get("force")
+        issue = input_data.get("issue")
+        root_causes = input_data.get("root_causes") or []
 
         sections.append(
-
             f"""
 ==========================
-ASPIRATION
+ASPIRATION & INITIAL INPUT
 ==========================
-
-{json.dumps(
-    aspiration["aspiration"],
-    indent=2,
-    ensure_ascii=False
-)}
+Aspiration text: {aspiration_data.get("text") if isinstance(aspiration_data, dict) else aspiration_data}
+Life Force: {force_label}
+Selected Issue: {issue}
+Root Causes: {", ".join(root_causes) if isinstance(root_causes, list) else str(root_causes)}
 """
         )
 
@@ -168,13 +227,22 @@ Completed Tasks Names:
     )
 
     if task:
+        resources_list = task.get("resources", [])
+        resources_text = ""
+        if resources_list:
+            resources_text = "\nResources:\n" + "\n".join([
+                f"- [{res.get('type') or 'resource'}] {res.get('title')}: {res.get('url')} (Reason: {res.get('reason')})"
+                for res in resources_list
+            ])
 
         sections.append(
 
             f"""
 ==========================
-TODAY'S TASK
+TODAY'S TASK (Day {task.get("day")})
 ==========================
+
+Day: {task.get("day")}
 
 Title :
 
@@ -194,7 +262,7 @@ Duration :
 
 Rationale :
 
-{task.get("rationale")}
+{task.get("rationale")}{resources_text}
 """
         )
 
@@ -207,15 +275,24 @@ Rationale :
     )
 
     if task_show:
+        resources_list = task_show.get("resources", [])
+        resources_text = ""
+        if resources_list:
+            resources_text = "\nResources:\n" + "\n".join([
+                f"- [{res.get('type') or 'resource'}] {res.get('title')}: {res.get('url')} (Reason: {res.get('reason')})"
+                for res in resources_list
+            ])
 
         sections.append(
 
             f"""
 ==========================
-SPECIFIC DAY TASK
+SPECIFIC DAY TASK (Day {task_show.get("day")})
 ==========================
 
-Title :
+Day: {task_show.get("day")}
+
+Title:
 
 {task_show.get("title")}
 
@@ -241,7 +318,7 @@ Completed :
 
 Rationale :
 
-{task_show.get("rationale")}
+{task_show.get("rationale")}{resources_text}
 """
         )
 
@@ -275,6 +352,61 @@ TASK HISTORY
 ==========================
 
 {history_text}
+"""
+        )
+
+    # ---------------------------------
+    # Task / Resource Search Results
+    # ---------------------------------
+    task_search = results.get("TASK_SEARCH")
+    if task_search:
+        search_lines = []
+        for t in task_search:
+            status = "Completed" if t.get("completed") else "Pending"
+            resources_list = t.get("resources", [])
+            resources_text = ""
+            if resources_list:
+                resources_text = "\n  Resources:\n" + "\n".join([
+                    f"  - [{res.get('type') or 'resource'}] {res.get('title')}: {res.get('url')} (Reason: {res.get('reason')})"
+                    for res in resources_list
+                ])
+            search_lines.append(
+                f"- Day {t.get('day')}: {t.get('title')}\n  Description: {t.get('description')}\n  Details: {t.get('duration_minutes')} mins at {t.get('scheduled_time')}\n  Status: {status}{resources_text}"
+            )
+        search_text = "\n\n".join(search_lines)
+        sections.append(
+            f"""
+==========================
+TASK SEARCH RESULTS
+==========================
+Found the following matching tasks:
+{search_text}
+"""
+        )
+
+    resource_search = results.get("RESOURCE_SEARCH") or results.get("RESOURCE_SHOW")
+    if resource_search:
+        search_lines = []
+        for t in resource_search:
+            status = "Completed" if t.get("completed") else "Pending"
+            resources_list = t.get("resources", [])
+            resources_text = ""
+            if resources_list:
+                resources_text = "\n  Resources:\n" + "\n".join([
+                    f"  - [{res.get('type') or 'resource'}] {res.get('title')}: {res.get('url')} (Reason: {res.get('reason')})"
+                    for res in resources_list
+                ])
+            search_lines.append(
+                f"- Day {t.get('day')}: {t.get('title')}\n  Description: {t.get('description')}\n  Details: {t.get('duration_minutes')} mins at {t.get('scheduled_time')}\n  Status: {status}{resources_text}"
+            )
+        search_text = "\n\n".join(search_lines)
+        sections.append(
+            f"""
+==========================
+RESOURCE SEARCH RESULTS
+==========================
+Found the following matching tasks/resources:
+{search_text}
 """
         )
 

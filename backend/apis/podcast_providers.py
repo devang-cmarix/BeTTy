@@ -23,7 +23,7 @@ LISTENNOTES_API_KEY = os.getenv("LISTENNOTES_API_KEY")
 PODCASTINDEX_API_KEY = os.getenv("PODCASTINDEX_API_KEY")
 PODCASTINDEX_API_SECRET = os.getenv("PODCASTINDEX_API_SECRET")
 
-itunes_limiter = RateLimiter(max_calls=1, period=3.0)         # informal ~20 req/min abuse limit
+itunes_limiter = RateLimiter(max_calls=10, period=60.0)         # iTunes documentation limit: 10 requests/min
 listennotes_limiter = RateLimiter(max_calls=1, period=1.0)    # free tier quota is monthly, not per-sec, but stay polite
 podcastindex_limiter = RateLimiter(max_calls=1, period=1.0)   # no published number; conservative default
 

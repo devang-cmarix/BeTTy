@@ -68,7 +68,8 @@ async def generate_replacements_node(
     import asyncio
     from utils.resource_helper import get_allowed_resource_types, fetch_and_validate_resources
 
-    async def add_real_resources(t):
+    import httpx
+    async def add_real_resources(t, client=None):
         baseline = state["baseline"]
         learning_preferences = baseline.get("learning_preferences", [])
         allowed = get_allowed_resource_types(learning_preferences)
@@ -84,26 +85,34 @@ async def generate_replacements_node(
             "run", "walk", "jog", "lift", "squat", "press", "push",
             "pull", "stretch", "yoga", "exercise", "movement",
         ]
-        if any(k in text for k in physical_keywords):
-            t["resources"] = []
-            return t
-
         requires_audio = any(w in text for w in ("listen", "hear", "podcast", "audio"))
         requires_video = any(w in text for w in ("watch", "watching", "video", "youtube"))
         wants_reading = any(w in text for w in ("read", "book", "article", "chapter"))
 
-        # Prioritize explicit task requests: fetch requested types even if not in user prefs
+        if not (requires_audio or requires_video or wants_reading):
+            if any(k in text for k in physical_keywords):
+                t["resources"] = []
+                return t
+
+        # Intersect the task requirements with the user's allowed resource types
         filtered_allowed = []
-        if requires_video:
+        if requires_video and "video" in allowed:
             filtered_allowed.append("video")
-        if requires_audio:
+        if requires_audio and "audio" in allowed:
             filtered_allowed.append("audio")
         if wants_reading:
-            filtered_allowed.extend(["book", "article"]) 
+            if "book" in allowed:
+                filtered_allowed.append("book")
+            if "article" in allowed:
+                filtered_allowed.append("article")
         filtered_allowed = list(dict.fromkeys(filtered_allowed))
+
+        from utils.resource_helper import ensure_fallback_resources, update_task_with_real_resources
 
         if not filtered_allowed:
             t["resources"] = []
+            t = ensure_fallback_resources(t, allowed)
+            t = update_task_with_real_resources(t)
             return t
 
         max_seconds = None
@@ -114,13 +123,13 @@ async def generate_replacements_node(
         except Exception:
             max_seconds = None
 
-        t["resources"] = await fetch_and_validate_resources(t["title"], filtered_allowed, max_duration_seconds=max_seconds)
-        from utils.resource_helper import ensure_fallback_resources, update_task_with_real_resources
-        t = ensure_fallback_resources(t)
+        t["resources"] = await fetch_and_validate_resources(t["title"], filtered_allowed, max_duration_seconds=max_seconds, client=client)
+        t = ensure_fallback_resources(t, allowed)
         t = update_task_with_real_resources(t)
         return t
 
-    alternatives = list(await asyncio.gather(*(add_real_resources(t) for t in alternatives)))
+    async with httpx.AsyncClient() as client:
+        alternatives = list(await asyncio.gather(*(add_real_resources(t, client) for t in alternatives)))
 
     state["alternatives"] = alternatives
 

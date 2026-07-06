@@ -14,16 +14,19 @@ YOUTUBE_RE = re.compile(r"(?:youtu\.be/|youtube\.com/watch\?v=|youtube\.com/shor
 
 
 class LinkValidator:
-    def __init__(self, concurrency: int = 8, timeout: float = 8.0):
+    def __init__(self, concurrency: int = 8, timeout: float = 8.0, client: httpx.AsyncClient | None = None):
         self.semaphore = asyncio.Semaphore(concurrency)
         self.timeout = timeout
-        self.client = httpx.AsyncClient(
+        self.client = client or httpx.AsyncClient(
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
             timeout=httpx.Timeout(timeout, connect=min(timeout, 5.0)),
             follow_redirects=True,
         )
+        self._owns_client = (client is None)
 
     async def close(self):
-        await self.client.aclose()
+        if self._owns_client:
+            await self.client.aclose()
 
     async def validate(self, resource: Resource) -> Resource:
         async with self.semaphore:

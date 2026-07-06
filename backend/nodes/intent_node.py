@@ -23,9 +23,23 @@ async def intent_node(state):
 
     chain = prompt | structured_llm
 
+    history = state.get("history", [])
+    formatted_history = ""
+    if history:
+        lines = []
+        for m in history:
+            role = m.get('role', m.get('type', 'user'))
+            content = m.get('content', '')
+            lines.append(f"{role}: {content}")
+            intent = m.get('intent')
+            if intent:
+                lines.append(f"  [Intent Metadata: domain={intent.get('domain')}, action={intent.get('action')}, day={intent.get('day')}]")
+        formatted_history = "\n".join(lines)
+
     result = await chain.ainvoke(
         {
-            "message": state["user_message"]
+            "message": state["user_message"],
+            "history": formatted_history
         }
     )
 
@@ -33,7 +47,7 @@ async def intent_node(state):
 
     state["day"] = result.day
 
-    state["keyword"] = result.keyword
+    state["keyword"] = result.keyword or state["user_message"]
 
     state["task_id"] = result.task_id
     

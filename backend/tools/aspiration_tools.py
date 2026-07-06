@@ -14,7 +14,8 @@ async def get_aspiration(
             "_id": ObjectId(journey_id)
         },
         {
-            "aspiration": 1
+            "aspiration": 1,
+            "input": 1
         }
     )
 
@@ -22,6 +23,7 @@ async def get_aspiration(
         raise ValueError("Journey not found.")
 
     aspiration = journey.get("aspiration")
+    input_data = journey.get("input")
 
     if not aspiration:
         return {
@@ -31,7 +33,8 @@ async def get_aspiration(
 
     return {
         "exists": True,
-        "aspiration": aspiration
+        "aspiration": aspiration,
+        "input": input_data
     }
 
 

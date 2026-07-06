@@ -1906,3 +1906,40 @@ input[type='range'] {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Chatbot Suggestion Pills */
+.betty-chatbot-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.betty-chatbot-suggestion-pill {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  color: #1e3a8a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.betty-chatbot-suggestion-pill:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.betty-chatbot-suggestion-pill:active {
+  transform: translateY(0);
+}
+

@@ -5,6 +5,8 @@ Your ONLY responsibility is to classify the user's request.
 
 Return structured output.
 
+Use the provided conversation history to resolve any references or pronouns (e.g., "it", "that", "the task", "then") in the user's latest message to the correct day, keyword, or task_id.
+
 -------------------------
 Domains
 -------------------------
@@ -225,6 +227,212 @@ SEARCH
 -------------------------
 
 User:
+Reflect on Communication Impact
+
+Domain:
+TASK
+
+Action:
+SEARCH
+
+-------------------------
+
+User:
+Mindfulness Meditation
+
+Domain:
+TASK
+
+Action:
+SEARCH
+
+-------------------------
+
+User:
+Podcast: Autonomy and Spiritual Growth: 'Recommended audio: Podcast: Autonomy and Spiritual Growth'
+
+Domain:
+RESOURCE
+
+Action:
+SEARCH
+
+User:
+Root Causes
+
+Domain:
+ASPIRATION
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Life Force
+
+Domain:
+ASPIRATION
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Baseline Scores
+
+Domain:
+BASELINE
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Core Values
+
+Domain:
+BASELINE
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Motives
+
+Domain:
+BASELINE
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Obstacles
+
+Domain:
+BASELINE
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Current State
+
+Domain:
+GAP_ANALYSIS
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Future State
+
+Domain:
+GAP_ANALYSIS
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+My Tasks
+
+Domain:
+PLAN
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Week Summary
+
+Domain:
+PLAN
+
+Action:
+SHOW
+
+-------------------------
+
+User:
+Progress
+
+Domain:
+PLAN
+
+Action:
+PROGRESS
+
+-------------------------
+
+User:
+give me root causes of 1. Fortune
+
+Domain:
+ASPIRATION
+
+Action:
+SHOW
+
+Keyword:
+Fortune
+
+-------------------------
+
+User:
+give me life force of 1. Fortune
+
+Domain:
+ASPIRATION
+
+Action:
+SHOW
+
+Keyword:
+Fortune
+
+User:
+my progress in faith force
+
+Domain:
+PLAN
+
+Action:
+PROGRESS
+
+Keyword:
+faith force
+
+-------------------------
+
+User:
+progress of fortune
+
+Domain:
+PLAN
+
+Action:
+PROGRESS
+
+Keyword:
+fortune
+
+-------------------------
+
+User:
 Hello
 
 Domain:
@@ -235,7 +443,47 @@ CHAT
 
 -------------------------
 
-Message
+History:
+user: show day 57 task
+assistant: Your task for Day 57 is Low-Impact Cardio.
+  [Intent Metadata: domain=TASK, action=SHOW, day=57]
 
+User:
+how to do it?
+
+Domain:
+TASK
+
+Action:
+EXPLAIN
+
+Day:
+57
+
+-------------------------
+
+History:
+user: tell me what is my day 12 task
+assistant: Your task for Day 12 is Mindful Stretching.
+  [Intent Metadata: domain=TASK, action=SHOW, day=12]
+
+User:
+complete it
+
+Domain:
+TASK
+
+Action:
+COMPLETE
+
+Day:
+12
+
+-------------------------
+
+History:
+{history}
+
+Message:
 {message}
 """

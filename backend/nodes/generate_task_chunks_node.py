@@ -31,6 +31,8 @@ async def generate_task_chunks_node(
 
     profile = state["profile"]
 
+    baseline = profile["baseline"]
+
     duration = state["plan_days"]
 
     chunks = build_chunks(
@@ -52,10 +54,9 @@ async def generate_task_chunks_node(
         | llm
     )
 
-    tasks = []
+    import asyncio
 
-    for start_day, end_day in chunks:
-
+    async def generate_chunk(start_day, end_day):
         baseline = profile["baseline"]
         learning_preferences = baseline.get(
             "learning_preferences",
@@ -116,6 +117,16 @@ async def generate_task_chunks_node(
         for index, task in enumerate(chunk_tasks, start=0):
             task["day"] = start_day + index
 
+        return chunk_tasks
+
+    # Run all chunks concurrently and preserve order
+    chunks_tasks_list = await asyncio.gather(*(
+        generate_chunk(start_day, end_day)
+        for start_day, end_day in chunks
+    ))
+
+    tasks = []
+    for chunk_tasks in chunks_tasks_list:
         tasks.extend(chunk_tasks)
 
     tasks = validate_task_duration(
@@ -130,7 +141,8 @@ async def generate_task_chunks_node(
 
     # Fetch and validate resources from real APIs concurrently
     import asyncio
-    async def add_real_resources(t):
+    import httpx
+    async def add_real_resources(t, client=None):
         baseline = profile["baseline"]
         learning_preferences = baseline.get("learning_preferences", [])
         allowed = get_allowed_resource_types(learning_preferences)
@@ -159,32 +171,37 @@ async def generate_task_chunks_node(
             "movement",
         ]
 
-        if any(k in text for k in physical_keywords):
-            t["resources"] = []
-            return t
-
         # Only request audio/video when the task explicitly asks for listening/watching
         requires_audio = any(w in text for w in ("listen", "hear", "podcast", "audio"))
         requires_video = any(w in text for w in ("watch", "watching", "video", "youtube"))
         wants_reading = any(w in text for w in ("read", "book", "article", "chapter"))
 
-        # Prioritize explicit task requests: if the task explicitly asks to
-        # watch/listen/read, attempt to fetch those types even if not in the
-        # user's learning_preferences. This ensures tasks that say "read" get
-        # books/articles, and tasks that say "watch" get videos.
+        if not (requires_audio or requires_video or wants_reading):
+            if any(k in text for k in physical_keywords):
+                t["resources"] = []
+                return t
+
+        # Intersect the task requirements with the user's allowed resource types
         filtered_allowed = []
-        if requires_video:
+        if requires_video and "video" in allowed:
             filtered_allowed.append("video")
-        if requires_audio:
+        if requires_audio and "audio" in allowed:
             filtered_allowed.append("audio")
         if wants_reading:
-            filtered_allowed.extend(["book", "article"]) 
+            if "book" in allowed:
+                filtered_allowed.append("book")
+            if "article" in allowed:
+                filtered_allowed.append("article")
         # Ensure uniqueness
         filtered_allowed = list(dict.fromkeys(filtered_allowed))
+
+        from utils.resource_helper import ensure_fallback_resources, update_task_with_real_resources
 
         # If no filtered_allowed types, don't fetch any external resources
         if not filtered_allowed:
             t["resources"] = []
+            t = ensure_fallback_resources(t, allowed)
+            t = update_task_with_real_resources(t)
             return t
 
         max_seconds = None
@@ -195,13 +212,13 @@ async def generate_task_chunks_node(
         except Exception:
             max_seconds = None
 
-        t["resources"] = await fetch_and_validate_resources(t["title"], filtered_allowed, max_duration_seconds=max_seconds)
-        from utils.resource_helper import ensure_fallback_resources, update_task_with_real_resources
-        t = ensure_fallback_resources(t)
+        t["resources"] = await fetch_and_validate_resources(t["title"], filtered_allowed, max_duration_seconds=max_seconds, client=client)
+        t = ensure_fallback_resources(t, allowed)
         t = update_task_with_real_resources(t)
         return t
 
-    tasks = list(await asyncio.gather(*(add_real_resources(t) for t in tasks)))
+    async with httpx.AsyncClient() as client:
+        tasks = list(await asyncio.gather(*(add_real_resources(t, client) for t in tasks)))
 
     state["task_chunks"] = tasks
 

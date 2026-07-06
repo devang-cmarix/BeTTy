@@ -6,42 +6,88 @@ from tools.tool_registry import (
 async def tool_router_node(state):
 
     results = {}
+    db = state["db"]
+    active_journey_id = state.get("journey_id")
+    keyword = state.get("keyword")
+
+    resolved_journey_id = active_journey_id
+    if keyword:
+        try:
+            cursor = db.aspirations.find({"baseline": {"$exists": True}}, {"input.force": 1})
+            async for doc in cursor:
+                force = doc.get("input", {}).get("force", "")
+                if force:
+                    kw_words = [w for w in keyword.lower().replace("/", " ").replace("-", " ").split() if len(w) > 2]
+                    force_words = [w for w in force.lower().replace("/", " ").replace("-", " ").split() if len(w) > 2]
+                    matched = False
+                    for kw in kw_words:
+                        for fw in force_words:
+                            if kw in fw or fw in kw:
+                                matched = True
+                                break
+                        if matched:
+                            break
+                    if matched:
+                        resolved_journey_id = str(doc["_id"])
+                        break
+        except Exception:
+            pass
+
+    if not resolved_journey_id:
+        try:
+            doc = await db.aspirations.find_one({"baseline": {"$exists": True}}, {"_id": 1})
+            if doc:
+                resolved_journey_id = str(doc["_id"])
+        except Exception:
+            pass
 
     for step in state["tool_plan"]:
 
-        tool_info = get_tool(
+        domain = step["domain"]
+        action = step["action"]
 
-            step["domain"],
+        try:
+            tool_info = get_tool(
 
-            step["action"]
+                domain,
 
-        )
+                action
 
-        tool = tool_info["function"]
+            )
 
-        required = tool_info["requires"]
+            tool = tool_info["function"]
 
-        kwargs = {}
+            required = tool_info["requires"]
 
-        for arg in required:
+            kwargs = {}
 
-            if arg not in state:
+            for arg in required:
 
-                continue
+                if arg not in state:
 
-            kwargs[arg] = state[arg]
+                    continue
 
-        output = await tool(
+                if arg == "journey_id":
+                    kwargs[arg] = resolved_journey_id
+                else:
+                    kwargs[arg] = state[arg]
 
-            state["db"],
+            output = await tool(
 
-            **kwargs
+                state["db"],
 
-        )
+                **kwargs
+
+            )
+        except Exception as e:
+            if action == "SEARCH" or domain == "HISTORY":
+                output = []
+            else:
+                output = {"exists": False, "error": str(e)}
 
         results[
 
-            f"{step['domain']}_{step['action']}"
+            f"{domain}_{action}"
 
         ] = output
 
